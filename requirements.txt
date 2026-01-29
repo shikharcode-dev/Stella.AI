@@ -1,5 +1,6 @@
-edge-tts
-SpeechRecognition
-pygame
-pywhatkit
-pipwin
+edge-tts==6.1.9
+SpeechRecognition==3.10.0
+pygame==2.5.2
+pywhatkit==5.4
+pyaudio==0.2.13
+pipwin==0.5.2; platform_system=="Windows"

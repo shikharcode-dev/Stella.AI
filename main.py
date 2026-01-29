@@ -2,66 +2,83 @@ import time
 
 from voice import listen, speak
 import commands
-from config import ASSISTANT_NAME
+
+from config import ASSISTANT_NAME, WAKE_WORDS, OWNER
 
 
 time.sleep(1)
 
-speak("Hello, I am Stella. I am ready.")
+speak("Stella is now online and ready.")
 
 
 sleep_mode = False
+running = True
 
 
-while True:
+while running:
 
-    command = listen()
+    try:
 
-    if not command:
-        continue
+        command = listen()
 
-    print("You:", command)
+        if not command:
+            continue
 
-
-    # Remove name
-    if ASSISTANT_NAME in command:
-        command = command.replace(ASSISTANT_NAME, "").strip()
+        print("You:", command)
 
 
-    # ---------- Sleep Mode ----------
-    if sleep_mode:
-
-        if "wake up" in command or "hey stella" in command:
-            sleep_mode = False
-            speak("Yes, I am ready now")
-
-        continue
+        # -------- STOP PROGRAM --------
+        if "stop" in command:
+            speak("Stopping Stella. Goodbye.")
+            break
 
 
-    # ---------- Stop / Pause ----------
-    if "stop" in command or "exit" in command:
-        sleep_mode = True
-        speak("I am going to sleep")
-        continue
+        # -------- SLEEP MODE --------
+        if "exit" in command:
+            sleep_mode = True
+            speak("I am in sleep mode.")
+            continue
 
 
-    # ---------- Shutdown ----------
-    if "shutdown" in command or "shut down" in command:
-        commands.shutdown_pc()
-        continue
+        # -------- WAKE UP --------
+        if sleep_mode:
+
+            if any(w in command for w in WAKE_WORDS):
+                sleep_mode = False
+                speak("I am awake now.")
+
+            continue
 
 
-    # ---------- Restart ----------
-    if "restart" in command:
-        commands.restart_pc()
-        continue
+        # Remove name
+        if ASSISTANT_NAME in command:
+            command = command.replace(ASSISTANT_NAME, "").strip()
 
 
-    # ---------- Smart System ----------
-    if commands.smart_open(command):
-        continue
+        # -------- SHUTDOWN --------
+        if "shutdown" in command:
+            speak("Shutting down PC.")
+            commands.shutdown_pc()
+            continue
 
 
-    # ---------- Unknown ----------
-    speak("Sorry, I did not understand")
+        # -------- RESTART --------
+        if "restart" in command:
+            speak("Restarting PC.")
+            commands.restart_pc()
+            continue
 
+
+        # -------- SMART COMMANDS --------
+        if commands.smart_open(command):
+            continue
+
+
+        # -------- UNKNOWN --------
+        speak("Sorry, I did not understand.")
+
+
+    except Exception as e:
+
+        print("Error:", e)
+        speak("Something went wrong.")

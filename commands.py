@@ -1,50 +1,35 @@
-import os
+import subprocess
+import platform
 import webbrowser
-import re
 import pywhatkit
+import os
 
 from voice import speak
 
 
-# ---------- Apps ----------
 APP_PATHS = {
     "vs code": "code",
-    "vscode": "code",
-    "visual studio code": "code",
-    "calculator": "calc",
     "notepad": "notepad",
-    "files": "explorer",
-    "file explorer": "explorer",
-    "chrome": "chrome"
+    "calculator": "calc",
+    "chrome": "chrome",
+    "files": "explorer"
 }
 
 
-# ---------- Known Sites ----------
-KNOWN_SITES = {
-    "google": "google.com",
-    "gmail": "mail.google.com",
-    "facebook": "facebook.com",
-    "instagram": "instagram.com",
-    "twitter": "twitter.com",
-    "linkedin": "linkedin.com",
-    "amazon": "amazon.in",
-    "chatgpt": "chat.openai.com",
-    "youtube": "youtube.com"
+SITES = {
+    "google": "https://google.com",
+    "youtube": "https://youtube.com",
+    "gmail": "https://mail.google.com",
+    "instagram": "https://instagram.com"
 }
 
 
-# ---------- Clean Text ----------
-def clean_text(text):
-    text = text.lower()
-    text = text.replace(" ", "")
-    return text
-
-
-# ---------- Open App ----------
-def open_app(command):
+# ---------- Apps ----------
+def open_app(cmd):
 
     for app in APP_PATHS:
-        if app in command:
+
+        if app in cmd:
             speak(f"Opening {app}")
             os.system(APP_PATHS[app])
             return True
@@ -52,69 +37,44 @@ def open_app(command):
     return False
 
 
-# ---------- Open Website ----------
-def open_website(command):
+# ---------- Websites ----------
+def open_site(cmd):
 
-    clean = clean_text(command)
+    for site in SITES:
 
-    # Known sites
-    for site in KNOWN_SITES:
-
-        if site in command or clean_text(site) in clean:
-
-            url = "https://" + KNOWN_SITES[site]
-
+        if site in cmd:
             speak(f"Opening {site}")
-            webbrowser.open(url)
-            return True
-
-
-    # Any .com .in .gov
-    match = re.search(r"([a-zA-Z0-9\-]+)\.(com|in|gov)", command)
-
-    if match:
-
-        site = match.group(0)
-
-        url = "https://" + site
-
-        speak(f"Opening {site}")
-        webbrowser.open(url)
-        return True
-
-
-    return False
-
-
-# ---------- Play YouTube ----------
-def play_youtube(command):
-
-    if "play" in command:
-
-        video = command
-        video = video.replace("play", "")
-        video = video.replace("on youtube", "")
-        video = video.replace("youtube", "")
-        video = video.strip()
-
-        if video:
-            speak(f"Playing {video} on YouTube")
-            pywhatkit.playonyt(video)
+            webbrowser.open(SITES[site])
             return True
 
     return False
 
 
-# ---------- Smart System ----------
-def smart_open(command):
+# ---------- YouTube ----------
+def play_youtube(cmd):
 
-    if play_youtube(command):
+    if "play" in cmd:
+
+        song = cmd.replace("play", "").strip()
+
+        if song:
+            speak(f"Playing {song} on YouTube")
+            pywhatkit.playonyt(song)
+            return True
+
+    return False
+
+
+# ---------- Smart ----------
+def smart_open(cmd):
+
+    if play_youtube(cmd):
         return True
 
-    if open_app(command):
+    if open_app(cmd):
         return True
 
-    if open_website(command):
+    if open_site(cmd):
         return True
 
     return False
@@ -122,11 +82,27 @@ def smart_open(command):
 
 # ---------- Shutdown ----------
 def shutdown_pc():
-    speak("Shutting down your computer")
-    os.system("shutdown /s /t 5")
+
+    speak("Shutting down your computer.")
+
+    system = platform.system()
+
+    if system == "Windows":
+        subprocess.run(["shutdown", "/s", "/t", "5"])
+
+    else:
+        subprocess.run(["shutdown", "-h", "now"])
 
 
 # ---------- Restart ----------
 def restart_pc():
-    speak("Restarting your computer")
-    os.system("shutdown /r /t 5")
+
+    speak("Restarting your computer.")
+
+    system = platform.system()
+
+    if system == "Windows":
+        subprocess.run(["shutdown", "/r", "/t", "5"])
+
+    else:
+        subprocess.run(["reboot"])

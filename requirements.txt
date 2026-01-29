@@ -1,0 +1,5 @@
+edge-tts
+SpeechRecognition
+pygame
+pywhatkit
+pipwin

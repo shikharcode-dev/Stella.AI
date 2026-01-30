@@ -5,35 +5,31 @@ import pygame
 import uuid
 import os
 import pyttsx3
+import threading
 
-
-# ================= SETTINGS =================
 
 VOICE = "en-US-JennyNeural"
 
 pygame.mixer.init()
 
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
 
-
-# ---------- OFFLINE ENGINE (Windows Female) ----------
+# ---------- OFFLINE ENGINE (MAIN) ----------
 engine = pyttsx3.init("sapi5")
 
 voices = engine.getProperty("voices")
 
 for v in voices:
-    if "female" in v.name.lower() or "zira" in v.name.lower():
+    if "zira" in v.name.lower() or "female" in v.name.lower():
         engine.setProperty("voice", v.id)
         break
 
 engine.setProperty("rate", 170)
 
 
-# ---------- EDGE TEMP ----------
+# ---------- EDGE (OPTIONAL) ----------
 async def _edge_speak(text):
 
-    filename = f"edge_{uuid.uuid4().hex}.mp3"
+    filename = "edge_temp.mp3"   # One fixed file
 
     try:
 
@@ -59,20 +55,20 @@ async def _edge_speak(text):
 
     finally:
 
+        # Always delete
         if os.path.exists(filename):
             try:
                 os.remove(filename)
             except:
                 pass
 
-
-# ---------- GOOGLE BACKUP ----------
+# ---------- GOOGLE ----------
 def _google_speak(text):
 
     try:
         from gtts import gTTS
 
-        filename = f"google_{uuid.uuid4().hex}.mp3"
+        filename = "google_temp.mp3"   # One fixed file
 
         tts = gTTS(text=text, lang="en", slow=False)
         tts.save(filename)
@@ -96,44 +92,45 @@ def _google_speak(text):
         return False
 
 
-# ---------- OFFLINE FEMALE ----------
+# ---------- OFFLINE ----------
 def _offline_speak(text):
 
-    try:
-
-        engine.say(text)
-        engine.runAndWait()
-        return True
-
-    except Exception as e:
-
-        print("Offline Error:", e)
-        return False
+    engine.say(text)
+    engine.runAndWait()
 
 
-# ---------- MAIN SPEAK ----------
+# ---------- THREAD SAFE SPEAK ----------
 def speak(text):
 
-    try:
+    def _run():
 
-        # 1️⃣ TEMP Edge (Best)
-        if loop.run_until_complete(_edge_speak(text)):
-            return
+        try:
 
+            # Try Edge once only
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
-        # 2️⃣ Offline Female
-        if _offline_speak(text):
-            return
-
-
-        # 3️⃣ Google
-        if _google_speak(text):
-            return
+                if loop.run_until_complete(_edge_speak(text)):
+                    return
+            except:
+                pass
 
 
-    except:
+            # Try Google
+            if _google_speak(text):
+                return
 
-        _offline_speak(text)
+
+            # Always fallback
+            _offline_speak(text)
+
+        except:
+
+            _offline_speak(text)
+
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 # ---------- LISTEN ----------
@@ -141,8 +138,11 @@ def listen():
 
     r = sr.Recognizer()
 
-    r.energy_threshold = 200
+    # Balanced speed + accuracy
+    r.energy_threshold = 150
     r.pause_threshold = 0.5
+    r.non_speaking_duration = 0.4
+
 
     try:
 
@@ -150,9 +150,14 @@ def listen():
 
             print("Listening...")
 
+            # Quick calibration
             r.adjust_for_ambient_noise(source, duration=0.2)
 
-            audio = r.listen(source)
+            audio = r.listen(
+                source,
+                timeout=4,            # Wait for speech
+                phrase_time_limit=10  # Allow long sentences
+            )
 
     except:
         return ""
@@ -163,4 +168,5 @@ def listen():
 
     except:
         return ""
-
+    
+    

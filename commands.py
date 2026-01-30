@@ -2,120 +2,149 @@ import subprocess
 import platform
 import webbrowser
 import pywhatkit
-import shutil
 
 from voice import speak
 
 
-APP_PATHS = {
-    "vs code": ["code"],
-    "notepad": ["notepad"],
-    "calculator": ["calc"],
-    "chrome": ["chrome"],
-    "files": ["explorer", "."]
+# ---------- DESKTOP APPS ----------
+DESKTOP_APPS = {
+    "vs code": "code",
+    "notepad": "notepad",
+    "chrome": "chrome",
+    "spotify": "spotify",
+    "telegram": "telegram",
+    "discord": "discord",
+    "word": "winword",
+    "excel": "excel",
+    "powerpoint": "powerpnt",
+    "files": "explorer"
 }
 
 
-SITES = {
-    "google": "https://google.com",
-    "youtube": "https://youtube.com",
-    "gmail": "https://mail.google.com",
-    "instagram": "https://instagram.com"
+# ---------- STORE / SYSTEM APPS ----------
+STORE_APPS = {
+    "whatsapp": "whatsapp:",
+    "microsoft store": "ms-windows-store:",
+    "store": "ms-windows-store:",
+    "settings": "ms-settings:",
+    "camera": "microsoft.windows.camera:",
+    "mail": "outlookmail:",
+    "calculator": "calculator:"
 }
 
 
-# ---------- Apps ----------
-def open_app(cmd):
+# ---------- SEARCH ----------
+def smart_search(cmd):
 
-    for app in APP_PATHS:
+    for key in ["search", "find", "look up"]:
 
-        if app in cmd:
+        if cmd.startswith(key):
 
-            exe = APP_PATHS[app][0]
+            q = cmd.replace(key, "").strip()
 
-            if shutil.which(exe):
+            speak(f"Searching {q}")
 
-                speak(f"Opening {app}")
-                subprocess.Popen(exe)
-
-                return True
-
-    return False
-
-
-# ---------- Websites ----------
-def open_site(cmd):
-
-    for site in SITES:
-
-        if site in cmd:
-
-            speak(f"Opening {site}")
-            webbrowser.open(SITES[site])
+            webbrowser.open(
+                f"https://www.google.com/search?q={q.replace(' ', '+')}"
+            )
 
             return True
 
     return False
 
 
-# ---------- YouTube ----------
+# ---------- OPEN APP ----------
+def open_any_app(cmd):
+
+    if not cmd.startswith("open "):
+        return False
+
+    app = cmd.replace("open", "").strip()
+
+
+    # Desktop apps
+    if app in DESKTOP_APPS:
+
+        exe = DESKTOP_APPS[app]
+
+        try:
+
+            speak(f"Opening {app}")
+
+            subprocess.Popen(
+                ["cmd", "/c", "start", "", exe],
+                shell=True
+            )
+
+            return True
+
+        except:
+            pass
+
+
+    # Store / system apps
+    if app in STORE_APPS:
+
+        uri = STORE_APPS[app]
+
+        try:
+
+            speak(f"Opening {app}")
+
+            subprocess.Popen(
+                ["cmd", "/c", "start", "", uri],
+                shell=True
+            )
+
+            return True
+
+        except:
+            pass
+
+
+    speak(f"I cannot find {app}")
+    return False
+
+
+# ---------- YOUTUBE ----------
 def play_youtube(cmd):
 
-    if "play" in cmd:
+    if cmd.startswith("play "):
 
         song = cmd.replace("play", "").strip()
 
-        if song:
+        speak(f"Playing {song}")
 
-            speak(f"Playing {song} on YouTube")
+        pywhatkit.playonyt(song)
 
-            pywhatkit.playonyt(song)
-
-            return True
+        return True
 
     return False
 
 
-# ---------- Smart ----------
+# ---------- SMART ----------
 def smart_open(cmd):
 
     return (
-        play_youtube(cmd)
-        or open_app(cmd)
-        or open_site(cmd)
+        smart_search(cmd)
+        or play_youtube(cmd)
+        or open_any_app(cmd)
     )
 
 
-# ---------- Shutdown ----------
+# ---------- SHUTDOWN ----------
 def shutdown_pc():
 
     speak("Shutting down your computer.")
 
-    system = platform.system()
-
-    if system == "Windows":
-        subprocess.run(["shutdown", "/s", "/t", "5"])
-
-    elif system == "Linux":
-        subprocess.run(["shutdown", "-h", "now"])
-
-    elif system == "Darwin":
-        subprocess.run(["osascript", "-e", 'tell app "System Events" to shut down'])
+    subprocess.run(["shutdown", "/s", "/t", "5"])
 
 
-# ---------- Restart ----------
+# ---------- RESTART ----------
 def restart_pc():
 
     speak("Restarting your computer.")
 
-    system = platform.system()
+    subprocess.run(["shutdown", "/r", "/t", "5"])
 
-    if system == "Windows":
-        subprocess.run(["shutdown", "/r", "/t", "5"])
-
-    elif system == "Linux":
-        subprocess.run(["reboot"])
-
-    elif system == "Darwin":
-        subprocess.run(["osascript", "-e", 'tell app "System Events" to restart'])
 

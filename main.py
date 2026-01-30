@@ -40,13 +40,19 @@ while True:
 
         # ---------- STOP ----------
         if command == "stop":
-            speak("Stopping Stella. Goodbye.")
+
+            try:
+                speak("Stopping Stella. Goodbye.")
+                time.sleep(4)   # Wait for voice to finish
+            except:
+                pass
+
+            print("Stella stopped.")
             break
 
-
-        # ---------- ONLY NAME (UHMM) ----------
+        # ---------- ONLY NAME ----------
         if command == ASSISTANT_NAME:
-            speak("Mmm-hmm?")
+            speak("hmm?")
             continue
 
 
@@ -105,3 +111,4 @@ while True:
         print("Error:", e)
 
         speak("Something went wrong. Please try again.")
+

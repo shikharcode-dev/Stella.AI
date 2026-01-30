@@ -4,3 +4,5 @@ pygame==2.5.2
 pywhatkit==5.4
 pyaudio==0.2.13
 pipwin==0.5.2; platform_system=="Windows"
+pyttsx3
+gTTS

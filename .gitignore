@@ -1,14 +1,16 @@
-# Python cache
+# Virtual env
+venv/
+venv*/
+
+# Cache
 __pycache__/
 *.pyc
-*.pyo
 
-# Virtual environment
-venv/
-env/
+# Voice temp
+edge_*.mp3
+google_*.mp3
+*_temp.mp3
 
-# Audio temp files
-voice_*.mp3
 
 # System files
 .DS_Store

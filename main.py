@@ -1,7 +1,7 @@
 import sys
 import time
-
-from voice import listen, speak
+import config
+from voice import listen, speak, get_response
 import commands
 
 from config import ASSISTANT_NAME, WAKE_WORDS, MIN_PYTHON, MAX_PYTHON
@@ -9,19 +9,21 @@ from config import ASSISTANT_NAME, WAKE_WORDS, MIN_PYTHON, MAX_PYTHON
 
 # ---------- Python Version Warning ----------
 if not (MIN_PYTHON <= sys.version_info[:2] <= MAX_PYTHON):
-
     print("⚠️ Best supported Python is 3.10 or 3.11")
     print("⚠️ You are using:", sys.version.split()[0])
 
 
 # ---------- Startup ----------
-time.sleep(1)
+time.sleep(0.6)
 
-speak("Stella is online and ready.")
+# time-based greeting
+speak(commands.smart_greeting())
+
+# optional startup line
+speak(get_response("startup"))
 
 
-sleep_mode = False
-
+sleep_mode = False 
 
 # ---------- Main Loop ----------
 while True:
@@ -39,28 +41,29 @@ while True:
 
 
         # ---------- STOP ----------
-        if command == "stop":
+        if any(word == command for word in config.COMMANDS_KEYWORDS["stop"]):
 
             try:
-                speak("Stopping Stella. Goodbye.")
-                time.sleep(4)   # Wait for voice to finish
+                speak(get_response("stop"))
+                time.sleep(4)
             except:
                 pass
 
             print("Stella stopped.")
             break
 
+
         # ---------- ONLY NAME ----------
         if command == ASSISTANT_NAME:
-            speak("hmm?")
+            speak(get_response("uhmm"))
             continue
 
 
         # ---------- SLEEP MODE ----------
-        if command in ["exit", "sleep"]:
+        if any(word in command for word in config.COMMANDS_KEYWORDS["sleep"]):
 
             sleep_mode = True
-            speak("Computer is going to sleep mode.")
+            speak(get_response("sleep_mode"))
             continue
 
 
@@ -70,45 +73,87 @@ while True:
             if any(word in command for word in WAKE_WORDS):
 
                 sleep_mode = False
-                speak("I am awake and ready.")
+                speak(get_response("wake_up"))
 
             continue
 
 
         # ---------- Remove Assistant Name ----------
         if ASSISTANT_NAME in command:
-
             command = command.replace(ASSISTANT_NAME, "").strip()
 
 
         # ---------- SHUTDOWN ----------
-        if "shutdown" in command:
-
-            speak("Your computer is shutting down.")
+        if any(word in command for word in config.COMMANDS_KEYWORDS["shutdown"]):
             commands.shutdown_pc()
             continue
 
 
         # ---------- RESTART ----------
-        if "restart" in command:
-
-            speak("Your computer is restarting.")
+        if any(word in command for word in config.COMMANDS_KEYWORDS["restart"]):
             commands.restart_pc()
             continue
+        
+        
+        # ---------- TIME ----------
+        if "time" in command:
+            speak(commands.tell_time())
+            continue
 
+          # ---------- DATE ----------
+        if "date" in command or "today" in command:
+            speak(commands.tell_date())
+            continue
+        
+        
+                # ---------- BATTERY ----------
+        if "battery" in command or "battery status" in command or "charge" in command:
+            speak(commands.battery_status())
+            continue
 
+        
+        
+         # ---------- GREETING ----------
+        if "good morning" in command or "good afternoon" in command or "good evening" in command or "good night" in command:
+            speak(commands.smart_greeting())
+            continue
+
+        
+        
+                # ---------- VOLUME ----------
+        if "increase volume" in command or "volume up" in command:
+            speak(commands.change_volume("up"))
+            continue
+
+        if "decrease volume" in command or "volume down" in command:
+            speak(commands.change_volume("down"))
+            continue
+
+        if "mute volume" in command or "mute" in command:
+            speak(commands.change_volume("mute"))
+            continue
+
+        if "unmute volume" in command or "unmute" in command:
+            speak(commands.change_volume("unmute"))
+            continue
+
+        
+        
+        
         # ---------- SMART COMMAND ----------
         if commands.smart_open(command):
             continue
 
 
         # ---------- UNKNOWN ----------
-        speak("Sorry, I did not understand that.")
+        speak(get_response("unknown"))
 
 
     except Exception as e:
 
+        import traceback
         print("Error:", e)
+        print("Full traceback:")
+        traceback.print_exc()
 
-        speak("Something went wrong. Please try again.")
-
+        speak(get_response("error"))

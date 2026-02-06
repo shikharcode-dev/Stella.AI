@@ -2,99 +2,76 @@ import asyncio
 import edge_tts
 import speech_recognition as sr
 import pygame
-import uuid
 import os
 import pyttsx3
 import threading
+import config
 
+is_speaking = False
 
-VOICE = "en-US-JennyNeural"
 
 pygame.mixer.init()
 
-
-# ---------- OFFLINE ENGINE (MAIN) ----------
+# ---------- OFFLINE ENGINE (BACKUP) ----------
 engine = pyttsx3.init("sapi5")
 
-voices = engine.getProperty("voices")
-
-for v in voices:
-    if "zira" in v.name.lower() or "female" in v.name.lower():
-        engine.setProperty("voice", v.id)
-        break
+engine.setProperty(
+    "voice",
+    r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0"
+)
 
 engine.setProperty("rate", 170)
 
+# Lock to prevent multiple threads using pyttsx3 at same time
+_speak_lock = threading.Lock()
 
-# ---------- EDGE (OPTIONAL) ----------
-async def _edge_speak(text):
+# Temp file for Edge TTS audio
+_EDGE_TTS_FILE = os.path.join(os.path.dirname(__file__), "edge_temp.mp3")
 
-    filename = "edge_temp.mp3"   # One fixed file
 
+# ---------- EDGE TTS (MAIN) ----------
+async def _edge_tts_generate(text):
+    """Generate audio using Edge TTS with Michelle voice"""
+    communicate = edge_tts.Communicate(text, "en-US-MichelleNeural")
+    with open(_EDGE_TTS_FILE, "wb") as f:
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                f.write(chunk["data"])
+
+
+def _edge_speak(text):
+    """Play speech using Edge TTS"""
     try:
+        asyncio.run(_edge_tts_generate(text))
 
-        communicate = edge_tts.Communicate(text, VOICE)
-        await communicate.save(filename)
+        if not os.path.exists(_EDGE_TTS_FILE):
+            return False
 
-        pygame.mixer.music.load(filename)
+        pygame.mixer.music.load(_EDGE_TTS_FILE)
         pygame.mixer.music.play()
 
         while pygame.mixer.music.get_busy():
-            await asyncio.sleep(0.1)
+            pygame.time.Clock().tick(30)
+
 
         pygame.mixer.music.unload()
 
         return True
 
-
     except Exception as e:
-
-        print("Edge Error:", e)
+        print("Edge TTS Error:", e)
         return False
 
-
     finally:
-
-        # Always delete
-        if os.path.exists(filename):
+        if os.path.exists(_EDGE_TTS_FILE):
             try:
-                os.remove(filename)
+                os.remove(_EDGE_TTS_FILE)
             except:
                 pass
 
-# ---------- GOOGLE ----------
-def _google_speak(text):
 
-    try:
-        from gtts import gTTS
-
-        filename = "google_temp.mp3"   # One fixed file
-
-        tts = gTTS(text=text, lang="en", slow=False)
-        tts.save(filename)
-
-        pygame.mixer.music.load(filename)
-        pygame.mixer.music.play()
-
-        while pygame.mixer.music.get_busy():
-            pass
-
-        pygame.mixer.music.unload()
-
-        os.remove(filename)
-
-        return True
-
-
-    except Exception as e:
-
-        print("Google Error:", e)
-        return False
-
-
-# ---------- OFFLINE ----------
+# ---------- OFFLINE (BACKUP) ----------
 def _offline_speak(text):
-
     engine.say(text)
     engine.runAndWait()
 
@@ -103,46 +80,46 @@ def _offline_speak(text):
 def speak(text):
 
     def _run():
+        global is_speaking
+        is_speaking = True
 
-        try:
-
-            # Try Edge once only
+        with _speak_lock:
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                # Try Edge TTS first (Michelle)
+                if _edge_speak(text):
+                    pass
+                else:
+                    print("Falling back to Zira...")
+                    _offline_speak(text)
 
-                if loop.run_until_complete(_edge_speak(text)):
-                    return
-            except:
-                pass
+            except Exception as e:
+                print("Speak error:", e)
+                try:
+                    _offline_speak(text)
+                except Exception as e2:
+                    print("Offline speak error:", e2)
 
-
-            # Try Google
-            if _google_speak(text):
-                return
-
-
-            # Always fallback
-            _offline_speak(text)
-
-        except:
-
-            _offline_speak(text)
-
+        is_speaking = False
 
     threading.Thread(target=_run, daemon=True).start()
+
 
 
 # ---------- LISTEN ----------
 def listen():
 
+    global is_speaking
+
+    if is_speaking:
+        return ""
+
     r = sr.Recognizer()
-
-    # Balanced speed + accuracy
-    r.energy_threshold = 150
-    r.pause_threshold = 0.5
-    r.non_speaking_duration = 0.4
-
+    r.dynamic_energy_threshold = True
+    
+    
+    r.energy_threshold = 300
+    r.pause_threshold = 0.8
+    r.non_speaking_duration = 0.5
 
     try:
 
@@ -150,23 +127,31 @@ def listen():
 
             print("Listening...")
 
-            # Quick calibration
             r.adjust_for_ambient_noise(source, duration=0.2)
 
             audio = r.listen(
                 source,
-                timeout=4,            # Wait for speech
-                phrase_time_limit=10  # Allow long sentences
+                timeout=3,
+                phrase_time_limit=6
             )
 
     except:
         return ""
 
-
     try:
-        return r.recognize_google(audio).lower()
+        text = r.recognize_google(audio, language="en-US").lower()
+        return text
 
+    except sr.UnknownValueError:
+        return ""
+    except sr.RequestError:
+        print("Network error - check internet connection")
+        return ""
     except:
         return ""
-    
-    
+
+
+# ---------- HELPER: GET RESPONSE ----------
+def get_response(key):
+    """Get response by key"""
+    return config.RESPONSES.get(key, "")
